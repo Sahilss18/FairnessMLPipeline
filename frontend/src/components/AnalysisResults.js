@@ -26,11 +26,20 @@ import {
   Radar
 } from 'recharts';
 
-const AnalysisResults = ({ result }) => {
+const AnalysisResults = ({ result, mode = 'baseline' }) => {
   if (!result) return null;
 
-  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning } = result;
-  const isBiased = prediction === 'biased' || prediction === 1;
+  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning, gpt2_reasoning, model_comparison } = result;
+  
+  // Use Ollama's prediction when in Ollama mode, otherwise use baseline
+  const displayPrediction = (mode === 'ollama' && gpt2_reasoning?.gpt2_prediction !== undefined) 
+    ? gpt2_reasoning.gpt2_prediction 
+    : prediction;
+  const displayConfidence = (mode === 'ollama' && gpt2_reasoning?.reasoning_confidence !== undefined)
+    ? gpt2_reasoning.reasoning_confidence
+    : confidence;
+  
+  const isBiased = displayPrediction === 'biased' || displayPrediction === 1;
 
   // Prepare semantic comparison data
   const semanticComparison = semantic_analysis ? [
@@ -53,7 +62,7 @@ const AnalysisResults = ({ result }) => {
     { metric: 'Norm', value: (embedding_stats.norm / 10) * 100 }
   ] : [];
 
-  const confidenceLevel = reasoning?.confidence_level || (confidence > 0.7 ? 'high' : confidence > 0.5 ? 'medium' : 'low');
+  const confidenceLevel = reasoning?.confidence_level || (displayConfidence > 0.7 ? 'high' : displayConfidence > 0.5 ? 'medium' : 'low');
 
   return (
     <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
@@ -96,7 +105,7 @@ const AnalysisResults = ({ result }) => {
                 <span className="font-semibold text-gray-300">Confidence</span>
               </div>
               <span className="text-2xl font-black bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
-                {(confidence * 100).toFixed(1)}%
+                {(displayConfidence * 100).toFixed(1)}%
               </span>
             </div>
             <div className="relative h-3 bg-gray-900 rounded-full overflow-hidden">
@@ -108,7 +117,7 @@ const AnalysisResults = ({ result }) => {
                     ? 'from-amber-500 to-orange-500'
                     : 'from-red-500 to-pink-500'
                 }`}
-                style={{ width: `${confidence * 100}%` }}
+                style={{ width: `${displayConfidence * 100}%` }}
               />
             </div>
             <div className="flex justify-between mt-2 text-xs text-gray-500">
@@ -130,14 +139,14 @@ const AnalysisResults = ({ result }) => {
           </div>
 
           {/* Low Confidence Warning */}
-          {confidence < 0.3 && (
+          {displayConfidence < 0.3 && (
             <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-amber-400 mb-2">⚠️ Uncertain Prediction</h4>
                   <p className="text-sm text-gray-300 mb-2">
-                    The model has very low confidence ({(confidence * 100).toFixed(0)}%) in this prediction.
+                    The model has very low confidence ({(displayConfidence * 100).toFixed(0)}%) in this prediction.
                   </p>
                   <p className="text-xs text-gray-400">
                     This comment may contain <strong className="text-amber-400">subtle or institutional bias</strong> that 
@@ -173,6 +182,157 @@ const AnalysisResults = ({ result }) => {
           )}
         </div>
       </div>
+
+      {/* Ollama Reasoning (Phase III) */}
+      {gpt2_reasoning && gpt2_reasoning.available && (
+        <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-3xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
+              <Brain className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Phase III: Ollama Autoregressive Reasoning</h3>
+              <p className="text-sm text-gray-400">Independent AI analysis with bias detection</p>
+            </div>
+          </div>
+
+          {/* Ollama Override Warning */}
+          {gpt2_reasoning.disagreement && (
+            <div className="bg-amber-500/20 border border-amber-500/50 rounded-2xl p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-amber-400 mb-2">⚠️ Ollama Disagrees with Baseline!</h4>
+                  <p className="text-sm text-gray-200 mb-2">
+                    <strong>Baseline Model:</strong> {gpt2_reasoning.baseline_prediction === 1 ? 'Biased' : 'Fair'} 
+                    {' → '}
+                    <strong className="text-purple-400">Ollama Model:</strong> {gpt2_reasoning.gpt2_prediction === 1 ? 'Biased ⚠️' : 'Fair ✓'}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Ollama detected bias patterns that the baseline model missed. Ollama's prediction is shown below.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <h4 className="font-semibold text-purple-400">Ollama Explanation</h4>
+            </div>
+            <p className="text-gray-200 leading-relaxed italic">
+              "{gpt2_reasoning.explanation}"
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
+              <div className="text-xs text-gray-500 mb-1">Model</div>
+              <div className="text-purple-400 font-bold">{gpt2_reasoning.model}</div>
+            </div>
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
+              <div className="text-xs text-gray-500 mb-1">Confidence</div>
+              <div className="text-purple-400 font-bold">{(gpt2_reasoning.reasoning_confidence * 100).toFixed(1)}%</div>
+            </div>
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
+              <div className="text-xs text-gray-500 mb-1">Prediction</div>
+              <div className={`font-bold ${gpt2_reasoning.gpt2_prediction === 1 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {gpt2_reasoning.gpt2_prediction === 1 ? 'Biased' : 'Fair'}
+              </div>
+            </div>
+            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
+              <div className="text-xs text-gray-500 mb-1">Agreement</div>
+              <div className={`font-bold ${gpt2_reasoning.disagreement ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {gpt2_reasoning.disagreement ? 'Disagree' : 'Agree'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      )}
+
+      {/* Model Comparison (Phase III) */}
+      {model_comparison && (
+        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-3xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl shadow-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Model Comparison</h3>
+              <p className="text-sm text-gray-400">Baseline vs Ollama Reasoning</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            {/* Baseline Model */}
+            <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-5 h-5 text-emerald-400" />
+                <h4 className="font-bold text-emerald-400">{model_comparison.baseline_model.name}</h4>
+              </div>
+              <p className="text-sm text-gray-300 mb-3 italic">
+                "{model_comparison.baseline_model.explanation}"
+              </p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">Type:</span>
+                <span className="text-emerald-400 font-semibold">{model_comparison.baseline_model.type}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-gray-500">Length:</span>
+                <span className="text-emerald-400 font-semibold">{model_comparison.baseline_model.explanation_length} words</span>
+              </div>
+            </div>
+
+            {/* GPT-2 Model */}
+            <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-5 h-5 text-purple-400" />
+                <h4 className="font-bold text-purple-400">{model_comparison.gpt2_model.name}</h4>
+              </div>
+              <p className="text-sm text-gray-300 mb-3 italic">
+                "{model_comparison.gpt2_model.explanation}"
+              </p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">Type:</span>
+                <span className="text-purple-400 font-semibold">{model_comparison.gpt2_model.type}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-gray-500">Length:</span>
+                <span className="text-purple-400 font-semibold">{model_comparison.gpt2_model.explanation_length} words</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Comparison Metrics */}
+          <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-cyan-400" />
+              <span className="font-bold text-cyan-400">Analysis</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+              <div className="flex items-center gap-2">
+                <span className={model_comparison.comparison_metrics.baseline_concise ? 'text-emerald-400' : 'text-gray-500'}>
+                  {model_comparison.comparison_metrics.baseline_concise ? '✓' : '○'}
+                </span>
+                <span className="text-gray-300">Baseline is concise</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={model_comparison.comparison_metrics.gpt2_detailed ? 'text-purple-400' : 'text-gray-500'}>
+                  {model_comparison.comparison_metrics.gpt2_detailed ? '✓' : '○'}
+                </span>
+                <span className="text-gray-300">GPT-2 is detailed</span>
+              </div>
+            </div>
+            <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-3">
+              <p className="text-sm font-semibold text-cyan-400">
+                💡 {model_comparison.comparison_metrics.recommendation}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Visualizations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

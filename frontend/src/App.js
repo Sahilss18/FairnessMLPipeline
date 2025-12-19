@@ -27,6 +27,8 @@ function App() {
   const [apiHealth, setApiHealth] = useState(null);
   const [activeTab, setActiveTab] = useState('analyze');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [useOllama, setUseOllama] = useState(false);
+  const [modelComparison, setModelComparison] = useState(false);
 
   useEffect(() => {
     checkApiHealth();
@@ -55,7 +57,8 @@ function App() {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/analyze`, {
-        comment: comment
+        comment: comment,
+        use_gpt2: useOllama || modelComparison
       });
       
       setResult(response.data);
@@ -210,6 +213,55 @@ function App() {
                     />
                   </div>
                   
+                  {/* Phase III Model Selection */}
+                  <div className="space-y-3 p-4 bg-[#0f0f0f] border border-gray-800 rounded-2xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles size={16} className="text-pink-500" />
+                      <span className="text-sm font-semibold text-gray-300">Phase III: Reasoning Model</span>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <label className="flex-1 flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-xl cursor-pointer hover:border-purple-500/50 transition-all">
+                        <input
+                          type="radio"
+                          checked={!useOllama && !modelComparison}
+                          onChange={() => { setUseOllama(false); setModelComparison(false); }}
+                          className="w-4 h-4 text-pink-500"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-white">Baseline Model</div>
+                          <div className="text-xs text-gray-500">Random Forest + SBERT</div>
+                        </div>
+                      </label>
+                      
+                      <label className="flex-1 flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-xl cursor-pointer hover:border-purple-500/50 transition-all">
+                        <input
+                          type="radio"
+                          checked={useOllama && !modelComparison}
+                          onChange={() => { setUseOllama(true); setModelComparison(false); }}
+                          className="w-4 h-4 text-pink-500"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-white">Ollama Reasoning (Qwen2.5)</div>
+                          <div className="text-xs text-gray-500">Autoregressive explanation</div>
+                        </div>
+                      </label>
+                      
+                      <label className="flex-1 flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-xl cursor-pointer hover:border-purple-500/50 transition-all">
+                        <input
+                          type="radio"
+                          checked={modelComparison}
+                          onChange={() => { setModelComparison(true); setUseOllama(false); }}
+                          className="w-4 h-4 text-pink-500"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-white">Compare Both</div>
+                          <div className="text-xs text-gray-500">Side-by-side analysis</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  
                   <div className="flex gap-3">
                     <button 
                       type="submit" 
@@ -249,7 +301,7 @@ function App() {
                 )}
               </div>
 
-              {result && <AnalysisResults result={result} />}
+              {result && <AnalysisResults result={result} mode={modelComparison ? 'compare' : useOllama ? 'ollama' : 'baseline'} />}
             </div>
           )}
 

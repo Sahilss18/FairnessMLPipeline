@@ -46,7 +46,8 @@ def analyze_comment():
     
     Request body:
     {
-        "comment": "text to analyze"
+        "comment": "text to analyze",
+        "use_gpt2": false  // Optional: use Ollama reasoning (Phase III)
     }
     """
     if detector is None:
@@ -59,12 +60,13 @@ def analyze_comment():
             return jsonify({'error': 'No comment provided'}), 400
         
         comment = data['comment'].strip()
+        use_gpt2 = data.get('use_gpt2', False)
         
         if not comment:
             return jsonify({'error': 'Empty comment'}), 400
         
-        # Analyze the comment
-        base_result = detector.analyze_comment(comment)
+        # Analyze the comment with optional GPT-2 reasoning
+        base_result = detector.analyze_comment(comment, use_gpt2=use_gpt2)
         
         # Enhanced response format for frontend
         prediction_label = "biased" if base_result['prediction'] == 1 else "fair"
@@ -110,6 +112,34 @@ def analyze_comment():
                 ]
             }
         }
+        
+        # Add Ollama reasoning if requested (Phase III)
+        if use_gpt2 and 'gpt2_reasoning' in base_result:
+            ollama_data = base_result['gpt2_reasoning']
+            # Convert numpy and boolean types to Python native types
+            if 'ollama_prediction' in ollama_data:
+                ollama_data['gpt2_prediction'] = int(ollama_data['ollama_prediction'])
+                ollama_data['ollama_prediction'] = int(ollama_data['ollama_prediction'])
+            if 'baseline_prediction' in ollama_data:
+                ollama_data['baseline_prediction'] = int(ollama_data['baseline_prediction'])
+            if 'disagreement' in ollama_data:
+                ollama_data['disagreement'] = bool(ollama_data['disagreement'])
+            if 'available' in ollama_data:
+                ollama_data['available'] = bool(ollama_data['available'])
+            response['gpt2_reasoning'] = ollama_data
+            
+        # Add model comparison if available
+        if 'model_comparison' in base_result:
+            comparison = base_result['model_comparison']
+            # Convert boolean types
+            if 'models_agree' in comparison:
+                comparison['models_agree'] = bool(comparison['models_agree'])
+            if 'comparison_metrics' in comparison:
+                metrics = comparison['comparison_metrics']
+                for key in metrics:
+                    if isinstance(metrics[key], bool):
+                        metrics[key] = bool(metrics[key])
+            response['model_comparison'] = comparison
         
         return jsonify(response)
     
@@ -257,4 +287,4 @@ if __name__ == '__main__':
     print("\nStarting server on http://localhost:5000")
     print("="*70 + "\n")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)

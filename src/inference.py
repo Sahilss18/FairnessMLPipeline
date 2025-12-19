@@ -39,12 +39,13 @@ class BiasDetector:
         
         print("Bias Detector ready.\n")
     
-    def analyze_comment(self, comment):
+    def analyze_comment(self, comment, use_gpt2=False):
         """
         Analyze a single comment for bias and fairness.
         
         Args:
             comment: Text string to analyze
+            use_gpt2: Whether to use Ollama for reasoning (Phase III)
             
         Returns:
             dict: Analysis results
@@ -65,11 +66,11 @@ class BiasDetector:
         
         # Generate explanation based purely on semantic analysis
         if cos_toxic > cos_positive:
-            explanation = "Meaning is closer to toxic language in semantic space."
+            base_explanation = "Meaning is closer to toxic language in semantic space."
         else:
-            explanation = "Meaning is closer to positive or fair expressions."
+            base_explanation = "Meaning is closer to positive or fair expressions."
         
-        return {
+        result = {
             'comment': comment,
             'prediction': prediction,
             'sentiment': sentiment,
@@ -77,8 +78,37 @@ class BiasDetector:
             'embedding_preview': np.round(embedding[0][:10], 4).tolist(),
             'similarity_to_positive': cos_positive,
             'similarity_to_toxic': cos_toxic,
-            'explanation': explanation
+            'explanation': base_explanation
         }
+        
+        # Add Ollama reasoning if requested (Phase III)
+        if use_gpt2:
+            try:
+                from ollama_reasoner import get_ollama_reasoner
+                reasoner = get_ollama_reasoner()
+                
+                ollama_result = reasoner.generate_reasoning(
+                    comment, prediction, probability,
+                    cos_positive, cos_toxic
+                )
+                
+                result['gpt2_reasoning'] = ollama_result
+                
+                # Add comparison between models
+                comparison = reasoner.compare_with_baseline(
+                    comment, base_explanation,
+                    ollama_result, prediction
+                )
+                result['model_comparison'] = comparison
+                
+            except Exception as e:
+                result['gpt2_reasoning'] = {
+                    'explanation': f'Ollama reasoning unavailable: {str(e)}',
+                    'model': 'Ollama (error)',
+                    'available': False
+                }
+        
+        return result
 
     
     def print_analysis(self, result):

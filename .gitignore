@@ -39,6 +39,8 @@ wheels/
 
 # Models and data
 models/*.pkl
+models/*.pem
+models/*.db
 embeddings/*.npy
 data/*.csv
 
@@ -46,6 +48,10 @@ data/*.csv
 outputs/*.png
 outputs/*.txt
 outputs/*.pdf
+outputs/*.csv
+
+# Node modules cache
+frontend/node_modules/.cache/
 
 # OS files
 .DS_Store

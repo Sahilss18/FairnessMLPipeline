@@ -96,14 +96,20 @@ class OllamaReasoner:
             return None
         
         try:
-            # Prompt Ollama for bias detection with clear instructions
-            prompt = f"""Analyze this comment for bias, discrimination, stereotypes, or unfair treatment based on gender, race, ethnicity, religion, or other protected characteristics.
+            # Let Ollama use its natural language understanding for bias detection
+            prompt = f"""Analyze the following comment for bias, unfairness, or disrespect.
+
+Consider:
+- Does it contain stereotypes, prejudice, or discrimination?
+- Is there disrespectful, insulting, or demeaning language toward any person or group?
+- Does it show contempt, mockery, or lack of respect?
+- Are there value judgments, personal attacks, or emotionally charged characterizations?
 
 Comment: "{comment}"
 
-Is this comment biased or discriminatory? Answer ONLY with "Yes" or "No" as the first word.
+Based on your understanding of language and fairness, is this comment biased or disrespectful?
 
-Answer:"""
+Answer only "Yes" or "No" as the first word:"""
             
             output = self.generate_completion(prompt, max_tokens=150)
             
@@ -298,13 +304,13 @@ Explanation:"""
             'comparison_metrics': {
                 'baseline_focused': 'Explicit toxic patterns',
                 'ollama_focused': 'Contextual bias and stereotypes',
-                'baseline_detailed': len(baseline_explanation) > 100,
-                'ollama_detailed': len(ollama_result.get('explanation', '')) > 50
-            },
-            'recommendation': (
-                'Both models agree on classification' if agreement 
-                else 'Review manually - models disagree'
-            )
+                'baseline_concise': len(baseline_explanation.split()) < 20,
+                'gpt2_detailed': len(ollama_result.get('explanation', '').split()) > 20,
+                'recommendation': (
+                    'Both models agree on classification' if agreement 
+                    else 'Ollama detected patterns that baseline missed - consider reviewing manually'
+                )
+            }
         }
 
 

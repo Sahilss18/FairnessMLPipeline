@@ -4,6 +4,7 @@ Provides REST endpoints for the React frontend
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from datetime import datetime
 import sys
 import os
 
@@ -12,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from inference import BiasDetector
 from config import EMBEDDING_MODEL_PATH, SENTENCE_TRANSFORMER_MODEL
+from audit_logger import get_audit_logger
 import numpy as np
 
 app = Flask(__name__)
@@ -29,13 +31,25 @@ except Exception as e:
     print(f"Error loading model: {e}")
     detector = None
 
+# Initialize audit logger
+print("Initializing audit chain...")
+try:
+    audit_logger = get_audit_logger()
+    print("Audit chain ready!")
+except Exception as e:
+    print(f"Warning: Audit logger initialization failed: {e}")
+    audit_logger = None
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Check if the API is running and model is loaded"""
+    audit_stats = audit_logger.get_stats() if audit_logger else {}
     return jsonify({
         'status': 'healthy',
-        'model_loaded': detector is not None
+        'model_loaded': detector is not None,
+        'audit_enabled': audit_logger is not None,
+        'audit_stats': audit_stats
     })
 
 
@@ -140,6 +154,31 @@ def analyze_comment():
                     if isinstance(metrics[key], bool):
                         metrics[key] = bool(metrics[key])
             response['model_comparison'] = comparison
+        
+        # 🔐 LOG TO AUDIT CHAIN (Blockchain-style accountability)
+        if audit_logger:
+            try:
+                model_used = 'compare' if 'model_comparison' in response else ('ollama' if use_gpt2 else 'baseline')
+                audit_entry = audit_logger.log_prediction(
+                    comment=comment,
+                    baseline_prediction=prediction_label,
+                    baseline_confidence=float(base_result['confidence']),
+                    semantic_similarity_positive=float(base_result['similarity_to_positive']),
+                    semantic_similarity_toxic=float(base_result['similarity_to_toxic']),
+                    model_used=model_used,
+                    ollama_prediction=response.get('gpt2_reasoning', {}).get('gpt2_prediction'),
+                    ollama_confidence=response.get('gpt2_reasoning', {}).get('reasoning_confidence')
+                )
+                response['audit'] = {
+                    'logged': True,
+                    'audit_id': audit_entry['audit_id'],
+                    'entry_hash': audit_entry['entry_hash'],
+                    'timestamp': audit_entry['timestamp']
+                }
+                print(f"✅ Logged to audit chain: ID {audit_entry['audit_id']}, Hash: {audit_entry['entry_hash'][:16]}...")
+            except Exception as e:
+                print(f"⚠️ Audit logging failed: {e}")
+                response['audit'] = {'logged': False, 'error': str(e)}
         
         return jsonify(response)
     
@@ -274,6 +313,73 @@ def get_examples():
     return jsonify({'examples': examples})
 
 
+@app.route('/api/audit/verify', methods=['GET'])
+def verify_audit_chain():
+    """
+    Verify the integrity of the audit chain.
+    Checks hash continuity and cryptographic signatures.
+    
+    Returns verification results with any errors found.
+    """
+    if not audit_logger:
+        return jsonify({'error': 'Audit chain not available'}), 503
+    
+    try:
+        verification = audit_logger.verify_chain()
+        return jsonify({
+            'verified': verification['chain_valid'],
+            'total_entries': verification['total_entries'],
+            'valid_entries': verification['valid_entries'],
+            'errors': verification['errors'],
+            'message': 'Audit chain is valid ✅' if verification['chain_valid'] 
+                      else f"Found {len(verification['errors'])} integrity violations ❌"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audit/export', methods=['GET'])
+def export_audit_log():
+    """
+    Export recent audit entries.
+    Query params:
+        limit: Number of entries to export (default: 100, max: 1000)
+    """
+    if not audit_logger:
+        return jsonify({'error': 'Audit chain not available'}), 503
+    
+    try:
+        limit = min(int(request.args.get('limit', 100)), 1000)
+        entries = audit_logger.export_audit_log(limit=limit)
+        
+        return jsonify({
+            'entries': entries,
+            'count': len(entries),
+            'exported_at': datetime.utcnow().isoformat() + 'Z'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audit/stats', methods=['GET'])
+def get_audit_stats():
+    """Get audit chain statistics."""
+    if not audit_logger:
+        return jsonify({'error': 'Audit chain not available'}), 503
+    
+    try:
+        stats = audit_logger.get_stats()
+        verification = audit_logger.verify_chain()
+        
+        return jsonify({
+            **stats,
+            'chain_verified': verification['chain_valid'],
+            'last_verified_at': datetime.utcnow().isoformat() + 'Z'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("\n" + "="*70)
     print("FAIRNESS DETECTION API SERVER")
@@ -284,6 +390,10 @@ if __name__ == '__main__':
     print("  POST /api/batch-analyze - Analyze multiple comments")
     print("  GET  /api/stats         - Get model statistics")
     print("  GET  /api/examples      - Get example comments")
+    print("\n🔐 Audit Chain Endpoints:")
+    print("  GET  /api/audit/verify  - Verify chain integrity")
+    print("  GET  /api/audit/export  - Export audit log")
+    print("  GET  /api/audit/stats   - Get audit statistics")
     print("\nStarting server on http://localhost:5000")
     print("="*70 + "\n")
     

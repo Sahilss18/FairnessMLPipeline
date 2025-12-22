@@ -9,7 +9,8 @@ import {
   Info,
   Sparkles,
   Target,
-  TrendingUp
+  TrendingUp,
+  Shield
 } from 'lucide-react';
 import {
   BarChart,
@@ -29,7 +30,7 @@ import {
 const AnalysisResults = ({ result, mode = 'baseline' }) => {
   if (!result) return null;
 
-  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning, gpt2_reasoning, model_comparison } = result;
+  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning, gpt2_reasoning, model_comparison, audit } = result;
   
   // Use Ollama's prediction when in Ollama mode, otherwise use baseline
   const displayPrediction = (mode === 'ollama' && gpt2_reasoning?.gpt2_prediction !== undefined) 
@@ -39,7 +40,18 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
     ? gpt2_reasoning.reasoning_confidence
     : confidence;
   
+  // Debug logging
+  console.log('AnalysisResults Debug:', {
+    mode,
+    baseline_prediction: prediction,
+    ollama_prediction: gpt2_reasoning?.gpt2_prediction,
+    displayPrediction,
+    hasGpt2Reasoning: !!gpt2_reasoning
+  });
+  
+  // Handle both string ('biased'/'fair') and numeric (1/0) prediction formats
   const isBiased = displayPrediction === 'biased' || displayPrediction === 1;
+  const predictionLabel = isBiased ? 'Biased' : 'Fair';
 
   // Prepare semantic comparison data
   const semanticComparison = semantic_analysis ? [
@@ -84,48 +96,66 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
               )}
             </div>
             <div className="flex-1">
-              <h2 className={`text-2xl font-bold mb-2 ${
-                isBiased ? 'text-red-400' : 'text-emerald-400'
-              }`}>
-                {isBiased ? 'Biased Content Detected' : 'Fair Content'}
-              </h2>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className={`text-2xl font-bold ${
+                  isBiased ? 'text-red-400' : 'text-emerald-400'
+                }`}>
+                  {isBiased ? 'Biased Content Detected' : 'Fair Content'}
+                </h2>
+                {mode === 'ollama' && (
+                  <span className="px-3 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xs font-bold rounded-full">
+                    Qwen2.5:3b
+                  </span>
+                )}
+                {mode === 'baseline' && (
+                  <span className="px-3 py-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white text-xs font-bold rounded-full">
+                    Baseline
+                  </span>
+                )}
+              </div>
               <p className="text-gray-400">
-                {isBiased 
-                  ? 'This content may contain bias or discriminatory patterns' 
-                  : 'This content appears fair and unbiased'}
+                {mode === 'ollama' 
+                  ? (isBiased 
+                      ? 'Ollama AI detected bias or disrespectful language in this content' 
+                      : 'Ollama AI found this content to be fair and respectful')
+                  : (isBiased 
+                      ? 'This content may contain bias or discriminatory patterns' 
+                      : 'This content appears fair and unbiased')}
               </p>
             </div>
           </div>
 
-          {/* Confidence Bar */}
-          <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-4 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-pink-500" />
-                <span className="font-semibold text-gray-300">Confidence</span>
+          {/* Confidence Bar - Only show for Baseline mode */}
+          {mode !== 'ollama' && (
+            <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-pink-500" />
+                  <span className="font-semibold text-gray-300">Confidence</span>
+                </div>
+                <span className="text-2xl font-black bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+                  {(displayConfidence * 100).toFixed(1)}%
+                </span>
               </div>
-              <span className="text-2xl font-black bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
-                {(displayConfidence * 100).toFixed(1)}%
-              </span>
+              <div className="relative h-3 bg-gray-900 rounded-full overflow-hidden">
+                <div 
+                  className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${
+                    confidenceLevel === 'high' 
+                      ? 'from-emerald-500 to-teal-500' 
+                      : confidenceLevel === 'medium'
+                      ? 'from-amber-500 to-orange-500'
+                      : 'from-red-500 to-pink-500'
+                  }`}
+                  style={{ width: `${displayConfidence * 100}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-xs text-gray-500">
+                <span>Low</span>
+                <span>Medium</span>
+                <span>High</span>
+              </div>
             </div>
-            <div className="relative h-3 bg-gray-900 rounded-full overflow-hidden">
-              <div 
-                className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${
-                  confidenceLevel === 'high' 
-                    ? 'from-emerald-500 to-teal-500' 
-                    : confidenceLevel === 'medium'
-                    ? 'from-amber-500 to-orange-500'
-                    : 'from-red-500 to-pink-500'
-                }`}
-                style={{ width: `${displayConfidence * 100}%` }}
-              />
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
-              <span>Low</span>
-              <span>Medium</span>
-              <span>High</span>
-            </div>
-          </div>
+          )}
 
           {/* Analyzed Text */}
           <div className="bg-[#0f0f0f] border border-gray-800 rounded-2xl p-4">
@@ -219,21 +249,17 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
           <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <h4 className="font-semibold text-purple-400">Ollama Explanation</h4>
+              <h4 className="font-semibold text-purple-400">Qwen2.5 AI Analysis</h4>
             </div>
             <p className="text-gray-200 leading-relaxed italic">
               "{gpt2_reasoning.explanation}"
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
-              <div className="text-xs text-gray-500 mb-1">Model</div>
+              <div className="text-xs text-gray-500 mb-1">AI Model</div>
               <div className="text-purple-400 font-bold">{gpt2_reasoning.model}</div>
-            </div>
-            <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
-              <div className="text-xs text-gray-500 mb-1">Confidence</div>
-              <div className="text-purple-400 font-bold">{(gpt2_reasoning.reasoning_confidence * 100).toFixed(1)}%</div>
             </div>
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">Prediction</div>
@@ -242,7 +268,7 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
               </div>
             </div>
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
-              <div className="text-xs text-gray-500 mb-1">Agreement</div>
+              <div className="text-xs text-gray-500 mb-1">vs Baseline</div>
               <div className={`font-bold ${gpt2_reasoning.disagreement ? 'text-amber-400' : 'text-emerald-400'}`}>
                 {gpt2_reasoning.disagreement ? 'Disagree' : 'Agree'}
               </div>
@@ -322,7 +348,7 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
                 <span className={model_comparison.comparison_metrics.gpt2_detailed ? 'text-purple-400' : 'text-gray-500'}>
                   {model_comparison.comparison_metrics.gpt2_detailed ? '✓' : '○'}
                 </span>
-                <span className="text-gray-300">GPT-2 is detailed</span>
+                <span className="text-gray-300">Ollama is detailed</span>
               </div>
             </div>
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-3">
@@ -531,6 +557,26 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
           </div>
         </div>
       </div>
+      
+      {/* Audit Chain Badge */}
+      {audit && audit.logged && (
+        <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500 rounded-lg">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-bold text-blue-400">🔐 Logged to Audit Chain</h4>
+                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full">Verified</span>
+              </div>
+              <p className="text-xs text-gray-400">
+                ID: {audit.audit_id} | Hash: {audit.entry_hash.substring(0, 16)}... | {new Date(audit.timestamp).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

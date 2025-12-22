@@ -54,21 +54,40 @@ class BiasDetector:
         embedding = self.embedder.encode([comment])
         
         # Get model prediction
-        prediction = self.model.predict(embedding)[0]
-        probability = self.model.predict_proba(embedding)[0][1]
+        rf_prediction = self.model.predict(embedding)[0]
+        rf_probability = self.model.predict_proba(embedding)[0][1]
         
         # Calculate semantic similarities
         cos_positive = util.cos_sim(embedding, self.positive_ref).item()
         cos_toxic = util.cos_sim(embedding, self.toxic_ref).item()
         
+        # Calculate semantic difference (how much closer to toxic vs positive)
+        semantic_diff = cos_toxic - cos_positive
+        
+        # SEMANTIC-FIRST PREDICTION:
+        # Always use semantic analysis as the primary indicator
+        # If content is semantically closer to toxic, it's biased
+        # If content is semantically closer to positive, it's fair
+        
+        if semantic_diff > 0:  # Closer to toxic
+            prediction = 1  # Biased
+            # Confidence based on how much closer to toxic
+            probability = min(0.50 + semantic_diff * 1.5, 0.95)
+        else:  # Closer to positive
+            prediction = 0  # Fair
+            # Confidence based on how much closer to positive
+            probability = min(0.50 + abs(semantic_diff) * 1.5, 0.95)
+        
         # Determine sentiment
         sentiment = "Toxic / Biased" if prediction == 1 else "Fair / Non-Toxic"
         
-        # Generate explanation based purely on semantic analysis
+        # Generate explanation based on semantic analysis
         if cos_toxic > cos_positive:
-            base_explanation = "Meaning is closer to toxic language in semantic space."
+            semantic_strength = "strongly" if abs(semantic_diff) > 0.2 else "slightly"
+            base_explanation = f"Meaning is {semantic_strength} closer to toxic language in semantic space."
         else:
-            base_explanation = "Meaning is closer to positive or fair expressions."
+            semantic_strength = "strongly" if abs(semantic_diff) > 0.2 else "slightly"
+            base_explanation = f"Meaning is {semantic_strength} closer to positive or fair expressions."
         
         result = {
             'comment': comment,

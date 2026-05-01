@@ -16,8 +16,8 @@ OUTPUTS_DIR = os.path.join(BASE_DIR, 'outputs')
 # Dataset paths
 DATASET_PATH = os.path.join(DATA_DIR, 'fairness_dataset.csv')
 
-# HuggingFace token for model downloads
-HF_TOKEN = "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"
+# HuggingFace token for model downloads (set via environment variable)
+HF_TOKEN = os.getenv('HF_TOKEN') or None
 
 # Model save paths
 BASELINE_MODEL_PATH = os.path.join(MODELS_DIR, 'baseline_rf_model.pkl')

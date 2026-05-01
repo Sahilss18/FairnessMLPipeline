@@ -57,7 +57,7 @@ Write-Host 'Press Ctrl+C to stop the server' -ForegroundColor Yellow
 Write-Host ''
 
 cd '$PROJECT_ROOT'
-python api/app.py
+& '$VENV_PATH\Scripts\python.exe' api/app.py
 
 Write-Host ''
 Write-Host 'Flask API server stopped.' -ForegroundColor Red

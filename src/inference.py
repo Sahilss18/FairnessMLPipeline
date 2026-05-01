@@ -39,13 +39,13 @@ class BiasDetector:
         
         print("Bias Detector ready.\n")
     
-    def analyze_comment(self, comment, use_ollama=False):
+    def analyze_comment(self, comment, use_groq=False):
         """
         Analyze a single comment for bias and fairness.
         
         Args:
             comment: Text string to analyze
-            use_ollama: Whether to use Ollama for reasoning (Phase III)
+            use_groq: Whether to use Groq for reasoning (Phase III)
             
         Returns:
             dict: Analysis results
@@ -100,30 +100,30 @@ class BiasDetector:
             'explanation': base_explanation
         }
         
-        # Add Ollama reasoning if requested (Phase III)
-        if use_ollama:
+        # Add Groq reasoning if requested (Phase III)
+        if use_groq:
             try:
-                from ollama_reasoner import get_ollama_reasoner
-                reasoner = get_ollama_reasoner()
+                from groq_reasoner import get_groq_reasoner
+                reasoner = get_groq_reasoner()
                 
-                ollama_result = reasoner.generate_reasoning(
+                groq_result = reasoner.generate_reasoning(
                     comment, prediction, probability,
                     cos_positive, cos_toxic
                 )
                 
-                result['ollama_reasoning'] = ollama_result
+                result['groq_reasoning'] = groq_result
                 
                 # Add comparison between models
                 comparison = reasoner.compare_with_baseline(
                     comment, base_explanation,
-                    ollama_result, prediction
+                    groq_result, prediction
                 )
                 result['model_comparison'] = comparison
                 
             except Exception as e:
-                result['ollama_reasoning'] = {
-                    'explanation': f'Ollama reasoning unavailable: {str(e)}',
-                    'model': 'Ollama (error)',
+                result['groq_reasoning'] = {
+                    'explanation': f'Groq reasoning unavailable: {str(e)}',
+                    'model': 'Groq (error)',
                     'available': False
                 }
         

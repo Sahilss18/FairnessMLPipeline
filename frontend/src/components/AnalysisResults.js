@@ -27,6 +27,7 @@ import {
   PolarRadiusAxis,
   Radar
 } from 'recharts';
+import { API_BASE_URL } from '../config';
 
 const AnalysisResults = ({ result, mode = 'baseline' }) => {
   // State for audit verification (must be before early return)
@@ -35,13 +36,23 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
   
   if (!result) return null;
 
-  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning, ollama_reasoning, model_comparison, audit } = result;
+  const {
+    prediction,
+    confidence,
+    semantic_analysis,
+    embedding_stats,
+    comment,
+    reasoning,
+    autoregressive_reasoning: autoregressiveReasoning,
+    model_comparison: modelComparisonData,
+    audit
+  } = result;
   
   // Verify audit chain integrity
   const handleVerifyChain = async () => {
     setVerifying(true);
     try {
-      const response = await fetch('http://localhost:5000/api/audit/verify');
+      const response = await fetch(`${API_BASE_URL}/api/audit/verify`);
       const data = await response.json();
       setVerificationResult(data);
     } catch (error) {
@@ -51,27 +62,28 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
     }
   };
   
-  // Use Ollama's prediction when in Ollama mode, otherwise use baseline
-  const displayPrediction = (mode === 'ollama' && ollama_reasoning?.ollama_prediction !== undefined) 
-    ? ollama_reasoning.ollama_prediction 
+  // Use the autoregressive model prediction when selected, otherwise use baseline.
+  const displayPrediction = (mode === 'autoregressive' && autoregressiveReasoning?.prediction !== undefined) 
+    ? autoregressiveReasoning.prediction 
     : prediction;
-  const displayConfidence = (mode === 'ollama' && ollama_reasoning?.reasoning_confidence !== undefined)
-    ? ollama_reasoning.reasoning_confidence
+  const displayConfidence = (mode === 'autoregressive' && autoregressiveReasoning?.reasoning_confidence !== undefined)
+    ? autoregressiveReasoning.reasoning_confidence
     : confidence;
+
+  const autoregressiveModel = modelComparisonData?.autoregressive_model;
+  const autoregressiveDetailed = modelComparisonData?.comparison_metrics?.autoregressive_detailed;
   
   // Debug logging
   console.log('AnalysisResults Debug:', {
     mode,
     baseline_prediction: prediction,
-    ollama_prediction: ollama_reasoning?.ollama_prediction,
+    autoregressive_prediction: autoregressiveReasoning?.prediction,
     displayPrediction,
-    hasOllamaReasoning: !!ollama_reasoning
+    hasAutoregressiveReasoning: !!autoregressiveReasoning
   });
   
   // Handle both string ('biased'/'fair') and numeric (1/0) prediction formats
   const isBiased = displayPrediction === 'biased' || displayPrediction === 1;
-  const predictionLabel = isBiased ? 'Biased' : 'Fair';
-
   // Prepare semantic comparison data
   const semanticComparison = semantic_analysis ? [
     { 
@@ -121,9 +133,9 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
                 }`}>
                   {isBiased ? 'Biased Content Detected' : 'Fair Content'}
                 </h2>
-                {mode === 'ollama' && (
+                {mode === 'autoregressive' && (
                   <span className="px-3 py-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xs font-bold rounded-full">
-                    Qwen2.5:3b
+                    Autoregressive Model
                   </span>
                 )}
                 {mode === 'baseline' && (
@@ -133,10 +145,10 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
                 )}
               </div>
               <p className="text-gray-400">
-                {mode === 'ollama' 
+                {mode === 'autoregressive' 
                   ? (isBiased 
-                      ? 'Ollama AI detected bias or disrespectful language in this content' 
-                      : 'Ollama AI found this content to be fair and respectful')
+                      ? 'Autoregressive model detected bias or disrespectful language in this content' 
+                      : 'Autoregressive model found this content to be fair and respectful')
                   : (isBiased 
                       ? 'This content may contain bias or discriminatory patterns' 
                       : 'This content appears fair and unbiased')}
@@ -145,7 +157,7 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
           </div>
 
           {/* Confidence Bar - Only show for Baseline mode */}
-          {mode !== 'ollama' && (
+          {mode !== 'autoregressive' && (
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-4 mb-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -232,33 +244,33 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
         </div>
       </div>
 
-      {/* Ollama Reasoning (Phase III) */}
-      {ollama_reasoning && ollama_reasoning.available && (
+      {/* Autoregressive Reasoning (Phase III) */}
+      {autoregressiveReasoning && autoregressiveReasoning.available && (
         <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-3xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white">Phase III: Ollama Autoregressive Reasoning</h3>
+              <h3 className="text-xl font-bold text-white">Phase III: Autoregressive Reasoning</h3>
               <p className="text-sm text-gray-400">Independent AI analysis with bias detection</p>
             </div>
           </div>
 
-          {/* Ollama Override Warning */}
-          {ollama_reasoning.disagreement && (
+          {/* Autoregressive Override Warning */}
+          {autoregressiveReasoning.disagreement && (
             <div className="bg-amber-500/20 border border-amber-500/50 rounded-2xl p-4 mb-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-bold text-amber-400 mb-2">⚠️ Ollama Disagrees with Baseline!</h4>
+                  <h4 className="font-bold text-amber-400 mb-2">⚠️ Autoregressive Model Disagrees with Baseline!</h4>
                   <p className="text-sm text-gray-200 mb-2">
-                    <strong>Baseline Model:</strong> {ollama_reasoning.baseline_prediction === 1 ? 'Biased' : 'Fair'} 
+                    <strong>Baseline Model:</strong> {autoregressiveReasoning.baseline_prediction === 1 ? 'Biased' : 'Fair'} 
                     {' → '}
-                    <strong className="text-purple-400">Ollama Model:</strong> {ollama_reasoning.ollama_prediction === 1 ? 'Biased ⚠️' : 'Fair ✓'}
+                    <strong className="text-purple-400">Autoregressive Model:</strong> {autoregressiveReasoning.prediction === 1 ? 'Biased ⚠️' : 'Fair ✓'}
                   </p>
                   <p className="text-xs text-gray-400">
-                    Ollama detected bias patterns that the baseline model missed. Ollama's prediction is shown below.
+                    The autoregressive model detected bias patterns that the baseline model missed. Its prediction is shown below.
                   </p>
                 </div>
               </div>
@@ -268,37 +280,36 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
           <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <h4 className="font-semibold text-purple-400">Qwen2.5 AI Analysis</h4>
+              <h4 className="font-semibold text-purple-400">Autoregressive Model Analysis</h4>
             </div>
             <p className="text-gray-200 leading-relaxed italic">
-              "{ollama_reasoning.explanation}"
+              "{autoregressiveReasoning.explanation}"
             </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">AI Model</div>
-              <div className="text-purple-400 font-bold">{ollama_reasoning.model}</div>
+              <div className="text-purple-400 font-bold">{autoregressiveReasoning.model}</div>
             </div>
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">Prediction</div>
-              <div className={`font-bold ${ollama_reasoning.ollama_prediction === 1 ? 'text-red-400' : 'text-emerald-400'}`}>
-                {ollama_reasoning.ollama_prediction === 1 ? 'Biased' : 'Fair'}
+              <div className={`font-bold ${autoregressiveReasoning.prediction === 1 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {autoregressiveReasoning.prediction === 1 ? 'Biased' : 'Fair'}
               </div>
             </div>
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">vs Baseline</div>
-              <div className={`font-bold ${ollama_reasoning.disagreement ? 'text-amber-400' : 'text-emerald-400'}`}>
-                {ollama_reasoning.disagreement ? 'Disagree' : 'Agree'}
+              <div className={`font-bold ${autoregressiveReasoning.disagreement ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {autoregressiveReasoning.disagreement ? 'Disagree' : 'Agree'}
               </div>
             </div>
           </div>
         </div>
       )}
-      )}
 
       {/* Model Comparison (Phase III) */}
-      {model_comparison && (
+      {modelComparisonData && (
         <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-3xl p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl shadow-lg">
@@ -306,7 +317,7 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">Model Comparison</h3>
-              <p className="text-sm text-gray-400">Baseline vs Ollama Reasoning</p>
+              <p className="text-sm text-gray-400">Baseline vs Autoregressive Reasoning</p>
             </div>
           </div>
 
@@ -315,37 +326,37 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Activity className="w-5 h-5 text-emerald-400" />
-                <h4 className="font-bold text-emerald-400">{model_comparison.baseline_model.name}</h4>
+                <h4 className="font-bold text-emerald-400">{modelComparisonData.baseline_model.name}</h4>
               </div>
               <p className="text-sm text-gray-300 mb-3 italic">
-                "{model_comparison.baseline_model.explanation}"
+                "{modelComparisonData.baseline_model.explanation}"
               </p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">Type:</span>
-                <span className="text-emerald-400 font-semibold">{model_comparison.baseline_model.type}</span>
+                <span className="text-emerald-400 font-semibold">{modelComparisonData.baseline_model.type}</span>
               </div>
               <div className="flex items-center justify-between text-xs mt-1">
                 <span className="text-gray-500">Length:</span>
-                <span className="text-emerald-400 font-semibold">{model_comparison.baseline_model.explanation_length} words</span>
+                <span className="text-emerald-400 font-semibold">{modelComparisonData.baseline_model.explanation_length} words</span>
               </div>
             </div>
 
-            {/* Ollama Model */}
+            {/* Autoregressive Model */}
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="w-5 h-5 text-purple-400" />
-                <h4 className="font-bold text-purple-400">{model_comparison.ollama_model.name}</h4>
+                <h4 className="font-bold text-purple-400">{autoregressiveModel?.name}</h4>
               </div>
               <p className="text-sm text-gray-300 mb-3 italic">
-                "{model_comparison.ollama_model.explanation}"
+                "{autoregressiveModel?.explanation}"
               </p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">Type:</span>
-                <span className="text-purple-400 font-semibold">{model_comparison.ollama_model.type}</span>
+                <span className="text-purple-400 font-semibold">{autoregressiveModel?.type}</span>
               </div>
               <div className="flex items-center justify-between text-xs mt-1">
                 <span className="text-gray-500">Length:</span>
-                <span className="text-purple-400 font-semibold">{model_comparison.ollama_model.explanation_length} words</span>
+                <span className="text-purple-400 font-semibold">{autoregressiveModel?.explanation_length} words</span>
               </div>
             </div>
           </div>
@@ -358,21 +369,21 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
               <div className="flex items-center gap-2">
-                <span className={model_comparison.comparison_metrics.baseline_concise ? 'text-emerald-400' : 'text-gray-500'}>
-                  {model_comparison.comparison_metrics.baseline_concise ? '✓' : '○'}
+                <span className={modelComparisonData.comparison_metrics.baseline_concise ? 'text-emerald-400' : 'text-gray-500'}>
+                  {modelComparisonData.comparison_metrics.baseline_concise ? '✓' : '○'}
                 </span>
                 <span className="text-gray-300">Baseline is concise</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={model_comparison.comparison_metrics.ollama_detailed ? 'text-purple-400' : 'text-gray-500'}>
-                  {model_comparison.comparison_metrics.ollama_detailed ? '✓' : '○'}
+                <span className={autoregressiveDetailed ? 'text-purple-400' : 'text-gray-500'}>
+                  {autoregressiveDetailed ? '✓' : '○'}
                 </span>
-                <span className="text-gray-300">Ollama is detailed</span>
+                <span className="text-gray-300">Autoregressive model is detailed</span>
               </div>
             </div>
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-xl p-3">
               <p className="text-sm font-semibold text-cyan-400">
-                💡 {model_comparison.comparison_metrics.recommendation}
+                💡 {modelComparisonData.comparison_metrics.recommendation}
               </p>
             </div>
           </div>

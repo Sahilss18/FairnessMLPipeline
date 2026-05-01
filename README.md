@@ -1,12 +1,15 @@
 # Fairness & Bias Detection System
 
-Multi-phase ML system for detecting bias and toxicity in text using Random Forest, Sentence-BERT embeddings, and Ollama Qwen2.5:3b reasoning model.
+Multi-phase ML system for detecting bias and toxicity in text using Random Forest, Sentence-BERT embeddings, and Groq-hosted reasoning.
 
 ## 🚀 Quick Start
 
 ```powershell
 # Start the web application (Flask + React)
 .\start_web_ui.ps1
+
+# Start API in production mode (Waitress)
+.\start_api_prod.ps1
 
 # Or run in offline mode
 .\start_offline.ps1
@@ -28,7 +31,7 @@ ProblemsInRes/
 │   ├── preprocessing.py         # Data preprocessing
 │   ├── baseline_model.py        # Phase I: Baseline RF
 │   ├── embedding_model.py       # Phase II: SBERT embeddings
-│   ├── ollama_reasoner.py       # Phase III: Ollama reasoning
+│   ├── groq_reasoner.py         # Phase III: Groq reasoning
 │   └── inference.py             # BiasDetector interface
 │
 ├── 📂 api/                       # Flask REST API backend
@@ -69,7 +72,7 @@ ProblemsInRes/
 ### Prerequisites
 - Python 3.12.7
 - Node.js 18+ (for frontend)
-- Ollama 0.13.4 (for Phase III reasoning)
+- Groq API key (for Phase III reasoning)
 
 ### Installation
 
@@ -80,10 +83,11 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-2. **Install Ollama**
+2. **Set Environment Variables**
 ```powershell
-# Download from https://ollama.ai
-ollama pull qwen2.5:3b
+$env:GROQ_API_KEY="your_groq_key_here"
+$env:HF_TOKEN="your_huggingface_token_if_needed"
+$env:REACT_APP_API_URL="http://localhost:5000"
 ```
 
 3. **Train Models**
@@ -107,10 +111,10 @@ cd ..
 - 80.33% accuracy
 - ~50ms inference time
 
-**2. Ollama Reasoning**
-- Qwen2.5:3b autoregressive model
+**2. Groq Reasoning**
+- Groq-hosted LLM reasoning
 - Natural language explanations
-- ~2.2s inference time
+- ~1-2s inference time
 - 85% accuracy (estimated)
 
 **3. Compare Both**
@@ -126,11 +130,11 @@ cd ..
 
 ## 📊 Performance Metrics
 
-| Metric | Baseline | Ollama | 
+| Metric | Baseline | Groq | 
 |--------|----------|--------|
 | Accuracy | 80.33% | ~85% |
-| Inference Time | 50ms | 2.2s |
-| Model Size | 90MB | 1.9GB |
+| Inference Time | 50ms | 1-2s |
+| Model Size | 90MB | Hosted |
 | Explainability | Scores | Natural Language |
 | Offline | ✅ Yes | ✅ Yes |
 
@@ -140,18 +144,25 @@ cd ..
 # Test API endpoints
 python tests/test_api.py
 
-# Test Ollama integration
+# Test Groq integration
 python tests/test_ollama_direct.py
 
 # Test full pipeline
 python tests/test_model_pipeline.py
 ```
 
+## 🚢 Production API Command
+
+```powershell
+# From project root
+.\.venv\Scripts\python.exe -m waitress --listen=0.0.0.0:5000 api.wsgi:app
+```
+
 ## 📖 Documentation
 
 - [Getting Started](docs/GETTING_STARTED.md) - First-time setup guide
 - [Setup Guide](docs/SETUP.md) - Detailed installation
-- [Phase III Implementation](docs/PHASE3_IMPLEMENTATION.md) - Ollama integration details
+- [Phase III Implementation](docs/PHASE3_IMPLEMENTATION.md) - Groq integration details
 - [Offline Mode](docs/OFFLINE_MODE.md) - Running without internet
 - [Frontend Guide](docs/FRONTEND_GUIDE.md) - UI customization
 
@@ -176,7 +187,7 @@ MIT License - See LICENSE file for details
 ## 🙏 Acknowledgments
 
 - Sentence-BERT (all-MiniLM-L6-v2)
-- Ollama (Qwen2.5:3b)
+- Groq
 - AiFairness Dataset
 
 ## 📧 Contact
@@ -185,4 +196,4 @@ For questions or issues, please open a GitHub issue.
 
 ---
 
-**Built with**: Python 3.12.7 • React 18.2.0 • Flask 3.0.0 • Ollama 0.13.4
+**Built with**: Python 3.12.7 • React 18.2.0 • Flask 3.0.0 • Groq API

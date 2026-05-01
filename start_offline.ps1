@@ -48,21 +48,21 @@ function Test-OfflineRequirements {
         $issues += "Train models before running"
     }
     
-    # Check Ollama
+    # Check Groq
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -TimeoutSec 2 -UseBasicParsing
-        if ($response.StatusCode -eq 200) {
-            $models = ($response.Content | ConvertFrom-Json).models
-            if ($models.name -contains "qwen2.5:3b") {
-                Write-Success "Ollama running with qwen2.5:3b"
-            } else {
-                Write-Warning "Ollama running but qwen2.5:3b not found"
-                $issues += "Download model: ollama pull qwen2.5:3b"
+        $groqKey = $env:GROQ_API_KEY
+        if ([string]::IsNullOrWhiteSpace($groqKey)) {
+            Write-Warning "GROQ_API_KEY is not set"
+            $issues += "Set GROQ_API_KEY environment variable"
+        } else {
+            $response = Invoke-WebRequest -Uri "https://api.groq.com/openai/v1/models" -Headers @{ Authorization = "Bearer $groqKey" } -TimeoutSec 10 -UseBasicParsing
+            if ($response.StatusCode -eq 200) {
+                Write-Success "Groq API reachable"
             }
         }
     } catch {
-        Write-Warning "Ollama not accessible"
-        $issues += "Start Ollama: ollama serve"
+        Write-Warning "Groq API not accessible"
+        $issues += "Check Groq API key and network access"
     }
     
     # Check frontend dependencies
@@ -157,7 +157,7 @@ Write-Host "✓ Frontend:   " -NoNewline -ForegroundColor Green
 Write-Host "http://localhost:3000" -ForegroundColor White -BackgroundColor DarkGreen
 Write-Host "✓ Backend:    " -NoNewline -ForegroundColor Green
 Write-Host "http://localhost:5000" -ForegroundColor White -BackgroundColor DarkGreen
-Write-Host "✓ Ollama:     " -NoNewline -ForegroundColor Green
+Write-Host "✓ Groq:       " -NoNewline -ForegroundColor Green
 Write-Host "http://localhost:11434" -ForegroundColor White -BackgroundColor DarkGreen
 
 Write-Host "`n📡 Mode: " -NoNewline -ForegroundColor Cyan

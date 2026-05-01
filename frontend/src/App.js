@@ -16,8 +16,7 @@ import {
 import AnalysisResults from './components/AnalysisResults';
 import ExampleComments from './components/ExampleComments';
 import Statistics from './components/Statistics';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+import { API_BASE_URL } from './config';
 
 function App() {
   const [comment, setComment] = useState('');
@@ -27,7 +26,7 @@ function App() {
   const [apiHealth, setApiHealth] = useState(null);
   const [activeTab, setActiveTab] = useState('analyze');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [useOllama, setUseOllama] = useState(false);
+  const [useAutoregressiveModel, setUseAutoregressiveModel] = useState(false);
   const [modelComparison, setModelComparison] = useState(false);
 
   useEffect(() => {
@@ -58,7 +57,7 @@ function App() {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/analyze`, {
         comment: comment,
-        use_ollama: useOllama || modelComparison
+        use_autoregressive: useAutoregressiveModel || modelComparison
       });
       
       setResult(response.data);
@@ -224,8 +223,8 @@ function App() {
                       <label className="flex-1 flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-xl cursor-pointer hover:border-purple-500/50 transition-all">
                         <input
                           type="radio"
-                          checked={!useOllama && !modelComparison}
-                          onChange={() => { setUseOllama(false); setModelComparison(false); }}
+                          checked={!useAutoregressiveModel && !modelComparison}
+                          onChange={() => { setUseAutoregressiveModel(false); setModelComparison(false); }}
                           className="w-4 h-4 text-pink-500"
                         />
                         <div>
@@ -237,12 +236,12 @@ function App() {
                       <label className="flex-1 flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-xl cursor-pointer hover:border-purple-500/50 transition-all">
                         <input
                           type="radio"
-                          checked={useOllama && !modelComparison}
-                          onChange={() => { setUseOllama(true); setModelComparison(false); }}
+                          checked={useAutoregressiveModel && !modelComparison}
+                          onChange={() => { setUseAutoregressiveModel(true); setModelComparison(false); }}
                           className="w-4 h-4 text-pink-500"
                         />
                         <div>
-                          <div className="text-sm font-medium text-white">Ollama Reasoning (Qwen2.5)</div>
+                          <div className="text-sm font-medium text-white">Autoregressive Model</div>
                           <div className="text-xs text-gray-500">Autoregressive explanation</div>
                         </div>
                       </label>
@@ -251,7 +250,7 @@ function App() {
                         <input
                           type="radio"
                           checked={modelComparison}
-                          onChange={() => { setModelComparison(true); setUseOllama(false); }}
+                          onChange={() => { setModelComparison(true); setUseAutoregressiveModel(false); }}
                           className="w-4 h-4 text-pink-500"
                         />
                         <div>
@@ -301,7 +300,7 @@ function App() {
                 )}
               </div>
 
-              {result && <AnalysisResults result={result} mode={modelComparison ? 'compare' : useOllama ? 'ollama' : 'baseline'} />}
+              {result && <AnalysisResults result={result} mode={modelComparison ? 'compare' : useAutoregressiveModel ? 'autoregressive' : 'baseline'} />}
             </div>
           )}
 

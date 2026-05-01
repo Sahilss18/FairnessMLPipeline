@@ -23,8 +23,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '../config';
 
 const COLORS = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b'];
 
@@ -85,7 +84,7 @@ const Statistics = () => {
     },
     { 
       phase: 'Phase 3', 
-      accuracy: 85.0, // Ollama enhanced detection
+      accuracy: 85.0, // Autoregressive model enhanced detection
       'Detection': 90.0 // Bias detection capability
     }
   ];
@@ -108,7 +107,7 @@ const Statistics = () => {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-white">Model Statistics</h2>
-            <p className="text-gray-400">Three-phase ML system with Ollama reasoning</p>
+            <p className="text-gray-400">Three-phase ML system with autoregressive reasoning</p>
           </div>
         </div>
       </div>
@@ -156,7 +155,7 @@ const Statistics = () => {
             <Activity className="w-6 h-6 text-emerald-400" />
             <h3 className="text-sm font-bold text-emerald-400">Phase 3</h3>
           </div>
-          <p className="text-3xl font-black text-white mb-1">Ollama</p>
+          <p className="text-3xl font-black text-white mb-1">Autoregressive</p>
           <p className="text-xs text-gray-400">Reasoning</p>
         </div>
       </div>
@@ -314,12 +313,12 @@ const Statistics = () => {
 
             <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-xl p-4">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-emerald-400 text-sm font-semibold">Ollama Model</span>
-                <span className="text-white font-bold">Qwen2.5:3b</span>
+                <span className="text-emerald-400 text-sm font-semibold">Autoregressive Model</span>
+                <span className="text-white font-bold">Hosted</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400 text-xs">3B Parameters</span>
-                <span className="text-emerald-400 font-bold text-xs">Local LLM</span>
+                <span className="text-gray-400 text-xs">External Inference</span>
+                <span className="text-emerald-400 font-bold text-xs">API-based</span>
               </div>
             </div>
           </div>

@@ -81,7 +81,7 @@ def analyze_comment():
     Request body:
     {
         "comment": "text to analyze",
-        "use_ollama": false  // Optional: use Ollama reasoning (Phase III)
+        "use_groq": false  // Optional: use Groq reasoning (Phase III)
     }
     """
     if detector is None:
@@ -94,13 +94,13 @@ def analyze_comment():
             return jsonify({'error': 'No comment provided'}), 400
         
         comment = data['comment'].strip()
-        use_ollama = data.get('use_ollama', False)
+        use_autoregressive = data.get('use_autoregressive', data.get('use_groq', False))
         
         if not comment:
             return jsonify({'error': 'Empty comment'}), 400
         
-        # Analyze the comment with optional Ollama reasoning
-        base_result = detector.analyze_comment(comment, use_ollama=use_ollama)
+        # Analyze the comment with optional autoregressive reasoning
+        base_result = detector.analyze_comment(comment, use_groq=use_autoregressive)
         
         # Enhanced response format for frontend
         prediction_label = "biased" if base_result['prediction'] == 1 else "fair"
@@ -147,20 +147,22 @@ def analyze_comment():
             }
         }
         
-        # Add Ollama reasoning if requested (Phase III)
-        if use_ollama and 'ollama_reasoning' in base_result:
-            ollama_data = base_result['ollama_reasoning']
+        # Add autoregressive reasoning if requested (Phase III)
+        if use_autoregressive and 'groq_reasoning' in base_result:
+            groq_data = base_result['groq_reasoning']
             # Convert numpy and boolean types to Python native types
-            if 'ollama_prediction' in ollama_data:
-
-                ollama_data['ollama_prediction'] = int(ollama_data['ollama_prediction'])
-            if 'baseline_prediction' in ollama_data:
-                ollama_data['baseline_prediction'] = int(ollama_data['baseline_prediction'])
-            if 'disagreement' in ollama_data:
-                ollama_data['disagreement'] = bool(ollama_data['disagreement'])
-            if 'available' in ollama_data:
-                ollama_data['available'] = bool(ollama_data['available'])
-            response['ollama_reasoning'] = ollama_data
+            if 'groq_prediction' in groq_data:
+                groq_data['groq_prediction'] = int(groq_data['groq_prediction'])
+            if 'baseline_prediction' in groq_data:
+                groq_data['baseline_prediction'] = int(groq_data['baseline_prediction'])
+            if 'disagreement' in groq_data:
+                groq_data['disagreement'] = bool(groq_data['disagreement'])
+            if 'available' in groq_data:
+                groq_data['available'] = bool(groq_data['available'])
+            if 'groq_prediction' in groq_data:
+                groq_data['prediction'] = int(groq_data['groq_prediction'])
+            response['groq_reasoning'] = groq_data
+            response['autoregressive_reasoning'] = groq_data
             
         # Add model comparison if available
         if 'model_comparison' in base_result:
@@ -173,12 +175,16 @@ def analyze_comment():
                 for key in metrics:
                     if isinstance(metrics[key], bool):
                         metrics[key] = bool(metrics[key])
+                if 'groq_detailed' in metrics:
+                    metrics['autoregressive_detailed'] = bool(metrics['groq_detailed'])
+            if 'groq_model' in comparison:
+                comparison['autoregressive_model'] = comparison['groq_model']
             response['model_comparison'] = comparison
         
         # 🔐 LOG TO AUDIT CHAIN (Blockchain-style accountability)
         if audit_logger:
             try:
-                model_used = 'compare' if 'model_comparison' in response else ('ollama' if use_ollama else 'baseline')
+                model_used = 'compare' if 'model_comparison' in response else ('autoregressive' if use_autoregressive else 'baseline')
                 audit_entry = audit_logger.log_prediction(
                     comment=comment,
                     baseline_prediction=prediction_label,
@@ -186,8 +192,8 @@ def analyze_comment():
                     semantic_similarity_positive=float(base_result['similarity_to_positive']),
                     semantic_similarity_toxic=float(base_result['similarity_to_toxic']),
                     model_used=model_used,
-                    ollama_prediction=response.get('ollama_reasoning', {}).get('ollama_prediction'),
-                    ollama_confidence=response.get('ollama_reasoning', {}).get('reasoning_confidence')
+                    ollama_prediction=response.get('autoregressive_reasoning', {}).get('groq_prediction'),
+                    ollama_confidence=response.get('autoregressive_reasoning', {}).get('reasoning_confidence')
                 )
                 response['audit'] = {
                     'logged': True,

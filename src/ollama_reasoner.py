@@ -295,7 +295,7 @@ Explanation:"""
                 'explanation': baseline_explanation,
                 'explanation_length': len(baseline_explanation.split())
             },
-            'gpt2_model': {
+            'ollama_model': {
                 'name': 'Ollama (Qwen2.5:3b)',
                 'type': 'LLM',
                 'explanation': ollama_result.get('explanation', ''),
@@ -305,7 +305,7 @@ Explanation:"""
                 'baseline_focused': 'Explicit toxic patterns',
                 'ollama_focused': 'Contextual bias and stereotypes',
                 'baseline_concise': len(baseline_explanation.split()) < 20,
-                'gpt2_detailed': len(ollama_result.get('explanation', '').split()) > 20,
+                'ollama_detailed': len(ollama_result.get('explanation', '').split()) > 20,
                 'recommendation': (
                     'Both models agree on classification' if agreement 
                     else 'Ollama detected patterns that baseline missed - consider reviewing manually'

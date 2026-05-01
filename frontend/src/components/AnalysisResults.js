@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   AlertTriangle, 
   CheckCircle, 
@@ -10,7 +10,8 @@ import {
   Sparkles,
   Target,
   TrendingUp,
-  Shield
+  Shield,
+  CheckCircle2
 } from 'lucide-react';
 import {
   BarChart,
@@ -28,25 +29,43 @@ import {
 } from 'recharts';
 
 const AnalysisResults = ({ result, mode = 'baseline' }) => {
+  // State for audit verification (must be before early return)
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState(null);
+  
   if (!result) return null;
 
-  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning, gpt2_reasoning, model_comparison, audit } = result;
+  const { prediction, confidence, semantic_analysis, embedding_stats, comment, reasoning, ollama_reasoning, model_comparison, audit } = result;
+  
+  // Verify audit chain integrity
+  const handleVerifyChain = async () => {
+    setVerifying(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/audit/verify');
+      const data = await response.json();
+      setVerificationResult(data);
+    } catch (error) {
+      setVerificationResult({ verified: false, error: error.message });
+    } finally {
+      setVerifying(false);
+    }
+  };
   
   // Use Ollama's prediction when in Ollama mode, otherwise use baseline
-  const displayPrediction = (mode === 'ollama' && gpt2_reasoning?.gpt2_prediction !== undefined) 
-    ? gpt2_reasoning.gpt2_prediction 
+  const displayPrediction = (mode === 'ollama' && ollama_reasoning?.ollama_prediction !== undefined) 
+    ? ollama_reasoning.ollama_prediction 
     : prediction;
-  const displayConfidence = (mode === 'ollama' && gpt2_reasoning?.reasoning_confidence !== undefined)
-    ? gpt2_reasoning.reasoning_confidence
+  const displayConfidence = (mode === 'ollama' && ollama_reasoning?.reasoning_confidence !== undefined)
+    ? ollama_reasoning.reasoning_confidence
     : confidence;
   
   // Debug logging
   console.log('AnalysisResults Debug:', {
     mode,
     baseline_prediction: prediction,
-    ollama_prediction: gpt2_reasoning?.gpt2_prediction,
+    ollama_prediction: ollama_reasoning?.ollama_prediction,
     displayPrediction,
-    hasGpt2Reasoning: !!gpt2_reasoning
+    hasOllamaReasoning: !!ollama_reasoning
   });
   
   // Handle both string ('biased'/'fair') and numeric (1/0) prediction formats
@@ -214,7 +233,7 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
       </div>
 
       {/* Ollama Reasoning (Phase III) */}
-      {gpt2_reasoning && gpt2_reasoning.available && (
+      {ollama_reasoning && ollama_reasoning.available && (
         <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-3xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
@@ -227,16 +246,16 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
           </div>
 
           {/* Ollama Override Warning */}
-          {gpt2_reasoning.disagreement && (
+          {ollama_reasoning.disagreement && (
             <div className="bg-amber-500/20 border border-amber-500/50 rounded-2xl p-4 mb-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-amber-400 mb-2">⚠️ Ollama Disagrees with Baseline!</h4>
                   <p className="text-sm text-gray-200 mb-2">
-                    <strong>Baseline Model:</strong> {gpt2_reasoning.baseline_prediction === 1 ? 'Biased' : 'Fair'} 
+                    <strong>Baseline Model:</strong> {ollama_reasoning.baseline_prediction === 1 ? 'Biased' : 'Fair'} 
                     {' → '}
-                    <strong className="text-purple-400">Ollama Model:</strong> {gpt2_reasoning.gpt2_prediction === 1 ? 'Biased ⚠️' : 'Fair ✓'}
+                    <strong className="text-purple-400">Ollama Model:</strong> {ollama_reasoning.ollama_prediction === 1 ? 'Biased ⚠️' : 'Fair ✓'}
                   </p>
                   <p className="text-xs text-gray-400">
                     Ollama detected bias patterns that the baseline model missed. Ollama's prediction is shown below.
@@ -252,25 +271,25 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
               <h4 className="font-semibold text-purple-400">Qwen2.5 AI Analysis</h4>
             </div>
             <p className="text-gray-200 leading-relaxed italic">
-              "{gpt2_reasoning.explanation}"
+              "{ollama_reasoning.explanation}"
             </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">AI Model</div>
-              <div className="text-purple-400 font-bold">{gpt2_reasoning.model}</div>
+              <div className="text-purple-400 font-bold">{ollama_reasoning.model}</div>
             </div>
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">Prediction</div>
-              <div className={`font-bold ${gpt2_reasoning.gpt2_prediction === 1 ? 'text-red-400' : 'text-emerald-400'}`}>
-                {gpt2_reasoning.gpt2_prediction === 1 ? 'Biased' : 'Fair'}
+              <div className={`font-bold ${ollama_reasoning.ollama_prediction === 1 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {ollama_reasoning.ollama_prediction === 1 ? 'Biased' : 'Fair'}
               </div>
             </div>
             <div className="bg-[#0f0f0f] border border-gray-800 rounded-xl p-3">
               <div className="text-xs text-gray-500 mb-1">vs Baseline</div>
-              <div className={`font-bold ${gpt2_reasoning.disagreement ? 'text-amber-400' : 'text-emerald-400'}`}>
-                {gpt2_reasoning.disagreement ? 'Disagree' : 'Agree'}
+              <div className={`font-bold ${ollama_reasoning.disagreement ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {ollama_reasoning.disagreement ? 'Disagree' : 'Agree'}
               </div>
             </div>
           </div>
@@ -311,22 +330,22 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
               </div>
             </div>
 
-            {/* GPT-2 Model */}
+            {/* Ollama Model */}
             <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="w-5 h-5 text-purple-400" />
-                <h4 className="font-bold text-purple-400">{model_comparison.gpt2_model.name}</h4>
+                <h4 className="font-bold text-purple-400">{model_comparison.ollama_model.name}</h4>
               </div>
               <p className="text-sm text-gray-300 mb-3 italic">
-                "{model_comparison.gpt2_model.explanation}"
+                "{model_comparison.ollama_model.explanation}"
               </p>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">Type:</span>
-                <span className="text-purple-400 font-semibold">{model_comparison.gpt2_model.type}</span>
+                <span className="text-purple-400 font-semibold">{model_comparison.ollama_model.type}</span>
               </div>
               <div className="flex items-center justify-between text-xs mt-1">
                 <span className="text-gray-500">Length:</span>
-                <span className="text-purple-400 font-semibold">{model_comparison.gpt2_model.explanation_length} words</span>
+                <span className="text-purple-400 font-semibold">{model_comparison.ollama_model.explanation_length} words</span>
               </div>
             </div>
           </div>
@@ -345,8 +364,8 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
                 <span className="text-gray-300">Baseline is concise</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={model_comparison.comparison_metrics.gpt2_detailed ? 'text-purple-400' : 'text-gray-500'}>
-                  {model_comparison.comparison_metrics.gpt2_detailed ? '✓' : '○'}
+                <span className={model_comparison.comparison_metrics.ollama_detailed ? 'text-purple-400' : 'text-gray-500'}>
+                  {model_comparison.comparison_metrics.ollama_detailed ? '✓' : '○'}
                 </span>
                 <span className="text-gray-300">Ollama is detailed</span>
               </div>
@@ -570,9 +589,50 @@ const AnalysisResults = ({ result, mode = 'baseline' }) => {
                 <h4 className="font-bold text-blue-400">🔐 Logged to Audit Chain</h4>
                 <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full">Verified</span>
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 mb-2">
                 ID: {audit.audit_id} | Hash: {audit.entry_hash.substring(0, 16)}... | {new Date(audit.timestamp).toLocaleString()}
               </p>
+              
+              {/* Verify Button */}
+              <button
+                onClick={handleVerifyChain}
+                disabled={verifying}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs rounded-lg transition-all disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                {verifying ? 'Verifying...' : 'Verify Chain Integrity'}
+              </button>
+              
+              {/* Verification Result */}
+              {verificationResult && (
+                <div className={`mt-2 p-2 rounded-lg text-xs ${
+                  verificationResult.verified 
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300' 
+                    : 'bg-red-500/10 border border-red-500/30 text-red-300'
+                }`}>
+                  {verificationResult.verified ? (
+                    <>
+                      <div className="flex items-center gap-1 font-bold mb-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Chain Verified ✓
+                      </div>
+                      <div className="text-gray-400">
+                        {verificationResult.total_entries} entries validated, 0 errors
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 font-bold mb-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Verification Failed ✗
+                      </div>
+                      <div className="text-gray-400">
+                        {verificationResult.message || verificationResult.error}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -64,8 +64,8 @@ Write-Host 'Flask API server stopped.' -ForegroundColor Red
 pause
 "@
     
-    $flaskScript | Out-File -FilePath "$env:TEMP\start_flask.ps1" -Encoding UTF8
-    Start-Process powershell -ArgumentList "-NoExit", "-File", "$env:TEMP\start_flask.ps1"
+    $flaskScript | Out-File -FilePath "${env:TEMP}\start_flask.ps1" -Encoding UTF8
+    Start-Process powershell -ArgumentList "-NoExit", "-File", "${env:TEMP}\start_flask.ps1"
 }
 
 # Function to start React frontend in a new window
@@ -96,8 +96,8 @@ if (`$LASTEXITCODE -eq 0) {
     pause
 }
 "@
-        $installScript | Out-File -FilePath "$env:TEMP\start_react.ps1" -Encoding UTF8
-        Start-Process powershell -ArgumentList "-NoExit", "-File", "$env:TEMP\start_react.ps1"
+        $installScript | Out-File -FilePath "${env:TEMP}\start_react.ps1" -Encoding UTF8
+        Start-Process powershell -ArgumentList "-NoExit", "-File", "${env:TEMP}\start_react.ps1"
     } else {
         $reactScript = @"
 Write-Host 'Starting React development server...' -ForegroundColor Green
@@ -112,8 +112,8 @@ Write-Host ''
 Write-Host 'React server stopped.' -ForegroundColor Red
 pause
 "@
-        $reactScript | Out-File -FilePath "$env:TEMP\start_react.ps1" -Encoding UTF8
-        Start-Process powershell -ArgumentList "-NoExit", "-File", "$env:TEMP\start_react.ps1"
+        $reactScript | Out-File -FilePath "${env:TEMP}\start_react.ps1" -Encoding UTF8
+        Start-Process powershell -ArgumentList "-NoExit", "-File", "${env:TEMP}\start_react.ps1"
     }
 }
 

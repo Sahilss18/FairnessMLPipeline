@@ -41,6 +41,26 @@ except Exception as e:
     audit_logger = None
 
 
+@app.route('/', methods=['GET'])
+def root():
+    """Basic API index route for browser access."""
+    return jsonify({
+        'service': 'Fairness Detection API',
+        'status': 'running',
+        'endpoints': [
+            '/api/health',
+            '/api/analyze',
+            '/api/batch-analyze',
+            '/api/stats',
+            '/api/examples',
+            '/api/audit/verify',
+            '/api/audit/export',
+            '/api/audit/stats'
+        ],
+        'frontend_url': 'http://localhost:3000'
+    })
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Check if the API is running and model is loaded"""
@@ -61,7 +81,7 @@ def analyze_comment():
     Request body:
     {
         "comment": "text to analyze",
-        "use_gpt2": false  // Optional: use Ollama reasoning (Phase III)
+        "use_ollama": false  // Optional: use Ollama reasoning (Phase III)
     }
     """
     if detector is None:
@@ -74,13 +94,13 @@ def analyze_comment():
             return jsonify({'error': 'No comment provided'}), 400
         
         comment = data['comment'].strip()
-        use_gpt2 = data.get('use_gpt2', False)
+        use_ollama = data.get('use_ollama', False)
         
         if not comment:
             return jsonify({'error': 'Empty comment'}), 400
         
-        # Analyze the comment with optional GPT-2 reasoning
-        base_result = detector.analyze_comment(comment, use_gpt2=use_gpt2)
+        # Analyze the comment with optional Ollama reasoning
+        base_result = detector.analyze_comment(comment, use_ollama=use_ollama)
         
         # Enhanced response format for frontend
         prediction_label = "biased" if base_result['prediction'] == 1 else "fair"
@@ -128,11 +148,11 @@ def analyze_comment():
         }
         
         # Add Ollama reasoning if requested (Phase III)
-        if use_gpt2 and 'gpt2_reasoning' in base_result:
-            ollama_data = base_result['gpt2_reasoning']
+        if use_ollama and 'ollama_reasoning' in base_result:
+            ollama_data = base_result['ollama_reasoning']
             # Convert numpy and boolean types to Python native types
             if 'ollama_prediction' in ollama_data:
-                ollama_data['gpt2_prediction'] = int(ollama_data['ollama_prediction'])
+
                 ollama_data['ollama_prediction'] = int(ollama_data['ollama_prediction'])
             if 'baseline_prediction' in ollama_data:
                 ollama_data['baseline_prediction'] = int(ollama_data['baseline_prediction'])
@@ -140,7 +160,7 @@ def analyze_comment():
                 ollama_data['disagreement'] = bool(ollama_data['disagreement'])
             if 'available' in ollama_data:
                 ollama_data['available'] = bool(ollama_data['available'])
-            response['gpt2_reasoning'] = ollama_data
+            response['ollama_reasoning'] = ollama_data
             
         # Add model comparison if available
         if 'model_comparison' in base_result:
@@ -158,7 +178,7 @@ def analyze_comment():
         # 🔐 LOG TO AUDIT CHAIN (Blockchain-style accountability)
         if audit_logger:
             try:
-                model_used = 'compare' if 'model_comparison' in response else ('ollama' if use_gpt2 else 'baseline')
+                model_used = 'compare' if 'model_comparison' in response else ('ollama' if use_ollama else 'baseline')
                 audit_entry = audit_logger.log_prediction(
                     comment=comment,
                     baseline_prediction=prediction_label,
@@ -166,8 +186,8 @@ def analyze_comment():
                     semantic_similarity_positive=float(base_result['similarity_to_positive']),
                     semantic_similarity_toxic=float(base_result['similarity_to_toxic']),
                     model_used=model_used,
-                    ollama_prediction=response.get('gpt2_reasoning', {}).get('gpt2_prediction'),
-                    ollama_confidence=response.get('gpt2_reasoning', {}).get('reasoning_confidence')
+                    ollama_prediction=response.get('ollama_reasoning', {}).get('ollama_prediction'),
+                    ollama_confidence=response.get('ollama_reasoning', {}).get('reasoning_confidence')
                 )
                 response['audit'] = {
                     'logged': True,

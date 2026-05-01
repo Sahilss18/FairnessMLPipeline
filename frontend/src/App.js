@@ -58,7 +58,7 @@ function App() {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/analyze`, {
         comment: comment,
-        use_gpt2: useOllama || modelComparison
+        use_ollama: useOllama || modelComparison
       });
       
       setResult(response.data);

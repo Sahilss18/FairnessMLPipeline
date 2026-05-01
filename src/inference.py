@@ -39,13 +39,13 @@ class BiasDetector:
         
         print("Bias Detector ready.\n")
     
-    def analyze_comment(self, comment, use_gpt2=False):
+    def analyze_comment(self, comment, use_ollama=False):
         """
         Analyze a single comment for bias and fairness.
         
         Args:
             comment: Text string to analyze
-            use_gpt2: Whether to use Ollama for reasoning (Phase III)
+            use_ollama: Whether to use Ollama for reasoning (Phase III)
             
         Returns:
             dict: Analysis results
@@ -101,7 +101,7 @@ class BiasDetector:
         }
         
         # Add Ollama reasoning if requested (Phase III)
-        if use_gpt2:
+        if use_ollama:
             try:
                 from ollama_reasoner import get_ollama_reasoner
                 reasoner = get_ollama_reasoner()
@@ -111,7 +111,7 @@ class BiasDetector:
                     cos_positive, cos_toxic
                 )
                 
-                result['gpt2_reasoning'] = ollama_result
+                result['ollama_reasoning'] = ollama_result
                 
                 # Add comparison between models
                 comparison = reasoner.compare_with_baseline(
@@ -121,7 +121,7 @@ class BiasDetector:
                 result['model_comparison'] = comparison
                 
             except Exception as e:
-                result['gpt2_reasoning'] = {
+                result['ollama_reasoning'] = {
                     'explanation': f'Ollama reasoning unavailable: {str(e)}',
                     'model': 'Ollama (error)',
                     'available': False

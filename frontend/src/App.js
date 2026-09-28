@@ -31,16 +31,19 @@ function App() {
 
   useEffect(() => {
     checkApiHealth();
+    const interval = setInterval(checkApiHealth, 8000);
+    return () => clearInterval(interval);
   }, []);
 
   const checkApiHealth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/health`);
+      const response = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 10000 });
       setApiHealth(response.data);
     } catch (err) {
       setApiHealth({ status: 'unhealthy', model_loaded: false });
     }
   };
+
 
   const handleAnalyze = async (e) => {
     e.preventDefault();

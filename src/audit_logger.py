@@ -9,11 +9,19 @@ Creates tamper-proof audit trail with:
 """
 
 import os
+import sys
 import json
 import sqlite3
 import hashlib
 from datetime import datetime
 from typing import Optional, Dict, List
+
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 from signer import Signer
 
 DB_PATH = "models/audit_chain.db"
@@ -52,7 +60,7 @@ class AuditLogger:
         """)
         conn.commit()
         conn.close()
-        print("✅ Audit chain database initialized")
+        print("[OK] Audit chain database initialized")
     
     def _get_last_hash(self) -> Optional[str]:
         """Get the hash of the most recent audit entry."""
@@ -76,8 +84,9 @@ class AuditLogger:
         semantic_similarity_positive: float,
         semantic_similarity_toxic: float,
         model_used: str = "baseline",
-        ollama_prediction: Optional[str] = None,
-        ollama_confidence: Optional[float] = None
+        groq_prediction: Optional[str] = None,
+        groq_confidence: Optional[float] = None,
+        **kwargs
     ) -> Dict:
         """
         Log a prediction to the audit chain.
@@ -88,13 +97,20 @@ class AuditLogger:
             baseline_confidence: Baseline confidence (0-1)
             semantic_similarity_positive: Similarity to positive reference
             semantic_similarity_toxic: Similarity to toxic reference
-            model_used: Which model was used ('baseline', 'ollama', or 'compare')
-            ollama_prediction: Ollama result (optional)
-            ollama_confidence: Ollama confidence (optional)
+            model_used: Which model was used ('baseline', 'groq', 'autoregressive', or 'compare')
+            groq_prediction: Groq LLM result (optional)
+            groq_confidence: Groq LLM confidence (optional)
         
         Returns:
             dict: Audit entry with hash and signature
         """
+        pred_val = groq_prediction if groq_prediction is not None else kwargs.get("ollama_prediction")
+        conf_val = groq_confidence if groq_confidence is not None else kwargs.get("ollama_confidence")
+        
+        # Normalize prediction label string if int passed
+        if isinstance(pred_val, int):
+            pred_val = "biased" if pred_val == 1 else "fair"
+
         prev_hash = self._get_last_hash()
         
         # Create entry data
@@ -106,8 +122,8 @@ class AuditLogger:
             "semantic_similarity_positive": round(semantic_similarity_positive, 4),
             "semantic_similarity_toxic": round(semantic_similarity_toxic, 4),
             "model_used": model_used,
-            "ollama_prediction": ollama_prediction,
-            "ollama_confidence": round(ollama_confidence, 4) if ollama_confidence else None
+            "ollama_prediction": str(pred_val) if pred_val is not None else None,
+            "ollama_confidence": round(float(conf_val), 4) if conf_val is not None else None
         }
         
         # Serialize for hashing and signing
@@ -264,8 +280,8 @@ class AuditLogger:
                 "comment": row[2][:100] + "..." if len(row[2]) > 100 else row[2],
                 "baseline_prediction": row[3],
                 "baseline_confidence": row[4],
-                "ollama_prediction": row[5],
-                "ollama_confidence": row[6],
+                "groq_prediction": row[5],
+                "groq_confidence": row[6],
                 "model_used": row[7],
                 "entry_hash": row[8]
             })
@@ -281,7 +297,7 @@ class AuditLogger:
         baseline_biased = cur.execute(
             "SELECT COUNT(*) FROM audit_chain WHERE baseline_prediction = 'biased'"
         ).fetchone()[0]
-        ollama_used = cur.execute(
+        groq_used = cur.execute(
             "SELECT COUNT(*) FROM audit_chain WHERE ollama_prediction IS NOT NULL"
         ).fetchone()[0]
         
@@ -291,7 +307,7 @@ class AuditLogger:
             "total_predictions": total,
             "baseline_biased_count": baseline_biased,
             "baseline_fair_count": total - baseline_biased,
-            "ollama_used_count": ollama_used,
+            "groq_used_count": groq_used,
             "chain_length": total
         }
 

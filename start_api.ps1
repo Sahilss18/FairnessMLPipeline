@@ -1,4 +1,5 @@
-# Start Flask API with fresh Python environment
+# Start Flask API with virtual environment
 $env:PYTHONDONTWRITEBYTECODE = "1"
 Set-Location -Path $PSScriptRoot
-python api/app.py
+& .\.venv\Scripts\python.exe api/app.py
+

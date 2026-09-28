@@ -48,21 +48,27 @@ function Test-OfflineRequirements {
         $issues += "Train models before running"
     }
     
-    # Check Groq
+    # Check Groq API
     try {
         $groqKey = $env:GROQ_API_KEY
-        if ([string]::IsNullOrWhiteSpace($groqKey)) {
-            Write-Warning "GROQ_API_KEY is not set"
-            $issues += "Set GROQ_API_KEY environment variable"
-        } else {
-            $response = Invoke-WebRequest -Uri "https://api.groq.com/openai/v1/models" -Headers @{ Authorization = "Bearer $groqKey" } -TimeoutSec 10 -UseBasicParsing
-            if ($response.StatusCode -eq 200) {
-                Write-Success "Groq API reachable"
+        if ([string]::IsNullOrWhiteSpace($groqKey) -and (Test-Path ".env")) {
+            $envLines = Get-Content ".env"
+            foreach ($line in $envLines) {
+                if ($line -match '^GROQ_API_KEY=(.+)$') {
+                    $groqKey = $matches[1].Trim()
+                }
             }
         }
+        if (-not [string]::IsNullOrWhiteSpace($groqKey)) {
+            $response = Invoke-WebRequest -Uri "https://api.groq.com/openai/v1/models" -Headers @{ Authorization = "Bearer $groqKey" } -TimeoutSec 10 -UseBasicParsing
+            if ($response.StatusCode -eq 200) {
+                Write-Success "Groq API reachable and key valid"
+            }
+        } else {
+            Write-Warning "GROQ_API_KEY is not set in environment or .env"
+        }
     } catch {
-        Write-Warning "Groq API not accessible"
-        $issues += "Check Groq API key and network access"
+        Write-Warning "Groq API not accessible (check network / key)"
     }
     
     # Check frontend dependencies
@@ -157,8 +163,8 @@ Write-Host "✓ Frontend:   " -NoNewline -ForegroundColor Green
 Write-Host "http://localhost:3000" -ForegroundColor White -BackgroundColor DarkGreen
 Write-Host "✓ Backend:    " -NoNewline -ForegroundColor Green
 Write-Host "http://localhost:5000" -ForegroundColor White -BackgroundColor DarkGreen
-Write-Host "✓ Groq:       " -NoNewline -ForegroundColor Green
-Write-Host "http://localhost:11434" -ForegroundColor White -BackgroundColor DarkGreen
+Write-Host "✓ Groq AI:    " -NoNewline -ForegroundColor Green
+Write-Host "https://api.groq.com (Cloud)" -ForegroundColor White -BackgroundColor DarkGreen
 
 Write-Host "`n📡 Mode: " -NoNewline -ForegroundColor Cyan
 Write-Host "OFFLINE" -ForegroundColor White -BackgroundColor DarkCyan

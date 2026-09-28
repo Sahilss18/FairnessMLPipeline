@@ -3,6 +3,9 @@ venv/
 env/
 ENV/
 .venv
+.env
+.env*.local
+
 
 # Python cache
 __pycache__/
@@ -37,21 +40,23 @@ wheels/
 # VS Code
 .vscode/
 
-# Models and data
-models/*.pkl
-models/*.pem
-models/*.db
+# Models, secrets and data
+*.pkl
+*.pem
+*.db
 embeddings/*.npy
 data/*.csv
+models/
+api/models/
 
 # Outputs
-outputs/*.png
-outputs/*.txt
-outputs/*.pdf
-outputs/*.csv
+outputs/
 
-# Node modules cache
-frontend/node_modules/.cache/
+# Node modules and build
+node_modules/
+frontend/node_modules/
+frontend/build/
+scratch/
 
 # OS files
 .DS_Store

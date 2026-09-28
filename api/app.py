@@ -8,6 +8,12 @@ from datetime import datetime
 import sys
 import os
 
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -192,8 +198,8 @@ def analyze_comment():
                     semantic_similarity_positive=float(base_result['similarity_to_positive']),
                     semantic_similarity_toxic=float(base_result['similarity_to_toxic']),
                     model_used=model_used,
-                    ollama_prediction=response.get('autoregressive_reasoning', {}).get('groq_prediction'),
-                    ollama_confidence=response.get('autoregressive_reasoning', {}).get('reasoning_confidence')
+                    groq_prediction=response.get('autoregressive_reasoning', {}).get('groq_prediction'),
+                    groq_confidence=response.get('autoregressive_reasoning', {}).get('reasoning_confidence')
                 )
                 response['audit'] = {
                     'logged': True,
@@ -201,9 +207,9 @@ def analyze_comment():
                     'entry_hash': audit_entry['entry_hash'],
                     'timestamp': audit_entry['timestamp']
                 }
-                print(f"✅ Logged to audit chain: ID {audit_entry['audit_id']}, Hash: {audit_entry['entry_hash'][:16]}...")
+                print(f"[AUDIT] Logged to audit chain: ID {audit_entry['audit_id']}, Hash: {audit_entry['entry_hash'][:16]}...")
             except Exception as e:
-                print(f"⚠️ Audit logging failed: {e}")
+                print(f"[WARN] Audit logging failed: {e}")
                 response['audit'] = {'logged': False, 'error': str(e)}
         
         return jsonify(response)
@@ -256,7 +262,13 @@ def batch_analyze():
                 result['embedding_preview'] = [float(x) for x in result['embedding_preview']]
                 results.append(result)
         
-        return jsonify({'results': results})
+        biased_cnt = sum(1 for r in results if r['prediction'] == 1)
+        return jsonify({
+            'results': results,
+            'total_analyzed': len(results),
+            'biased_count': biased_cnt,
+            'fair_count': len(results) - biased_cnt
+        })
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -416,7 +428,7 @@ if __name__ == '__main__':
     print("  POST /api/batch-analyze - Analyze multiple comments")
     print("  GET  /api/stats         - Get model statistics")
     print("  GET  /api/examples      - Get example comments")
-    print("\n🔐 Audit Chain Endpoints:")
+    print("\n[AUDIT] Audit Chain Endpoints:")
     print("  GET  /api/audit/verify  - Verify chain integrity")
     print("  GET  /api/audit/export  - Export audit log")
     print("  GET  /api/audit/stats   - Get audit statistics")

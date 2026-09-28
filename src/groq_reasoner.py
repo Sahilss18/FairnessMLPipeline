@@ -5,15 +5,16 @@ Uses Groq's OpenAI-compatible API for bias detection and explanation generation.
 
 import os
 import requests
+from config import GROQ_API_KEY, GROQ_MODEL
 
 
 class GroqReasoner:
     """Groq-based reasoning for bias detection with independent analysis."""
 
-    def __init__(self, model_name="llama-3.3-70b-versatile", base_url="https://api.groq.com/openai/v1"):
-        self.model_name = model_name
+    def __init__(self, model_name=None, base_url="https://api.groq.com/openai/v1"):
         self.base_url = base_url
-        self.api_key = os.getenv("GROQ_API_KEY")
+        self.api_key = os.getenv("GROQ_API_KEY") or GROQ_API_KEY
+        self.model_name = model_name or os.getenv("GROQ_MODEL") or GROQ_MODEL or "qwen/qwen3.8-27b"
         self.available = False
 
         if not self.api_key:
@@ -27,10 +28,27 @@ class GroqReasoner:
                 timeout=10,
             )
             if response.status_code == 200:
-                self.available = True
-                print(f"Groq reasoner initialized with {model_name}")
+                models_data = response.json().get("data", [])
+                available_ids = [m.get("id") for m in models_data if isinstance(m, dict)]
+                
+                # If requested model is available, use it; otherwise fallback to best available
+                if self.model_name in available_ids:
+                    self.available = True
+                else:
+                    candidates = ["qwen/qwen3.8-27b", "groq/compound-mini", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+                    matched = next((c for c in candidates if c in available_ids), None)
+                    if matched:
+                        self.model_name = matched
+                        self.available = True
+                    elif available_ids:
+                        self.model_name = available_ids[0]
+                        self.available = True
+                    else:
+                        self.available = True
+
+                print(f"Groq reasoner initialized with model: {self.model_name}")
             else:
-                print(f"Warning: Groq API responded with {response.status_code}")
+                print(f"Warning: Groq API responded with {response.status_code}: {response.text}")
         except Exception as e:
             print(f"Warning: Could not connect to Groq: {e}")
 
@@ -38,30 +56,34 @@ class GroqReasoner:
         if not self.available:
             return None
 
-        response = requests.post(
-            f"{self.base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.model_name,
-                "messages": [
-                    {"role": "system", "content": "You are a careful fairness and bias analysis assistant."},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.2,
-                "max_tokens": max_tokens,
-            },
-            timeout=30,
-        )
+        try:
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model_name,
+                    "messages": [
+                        {"role": "system", "content": "You are a careful fairness and bias analysis assistant."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": max_tokens,
+                },
+                timeout=30,
+            )
 
-        if response.status_code != 200:
-            print(f"Groq API error: {response.status_code} - {response.text}")
+            if response.status_code != 200:
+                print(f"Groq API error: {response.status_code} - {response.text}")
+                return None
+
+            payload = response.json()
+            return payload["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"Groq request exception: {e}")
             return None
-
-        payload = response.json()
-        return payload["choices"][0]["message"]["content"].strip()
 
     def detect_bias_with_groq(self, comment):
         if not self.available:
@@ -74,24 +96,24 @@ Comment: "{comment}"
 Answer with exactly one word first: Yes or No.
 Then provide a brief reason in one sentence.'''
 
-        output = self._chat(prompt, max_tokens=80)
+        output = self._chat(prompt, max_tokens=90)
         if not output:
             return None
 
         output_clean = output.strip()
-        first_word = output_clean.split()[0].lower() if output_clean else ""
+        first_word = output_clean.split()[0].lower().strip(".,:;!?") if output_clean else ""
         is_yes = first_word.startswith("yes")
         is_no = first_word.startswith("no")
 
         if is_yes:
             groq_predicts_bias = True
-            groq_confidence = 0.78
+            groq_confidence = 0.85
         elif is_no:
             groq_predicts_bias = False
-            groq_confidence = 0.78
+            groq_confidence = 0.85
         else:
-            groq_predicts_bias = "biased" in output_clean.lower()
-            groq_confidence = 0.65
+            groq_predicts_bias = "bias" in output_clean.lower() or "toxic" in output_clean.lower() or "stereotype" in output_clean.lower()
+            groq_confidence = 0.70
 
         return {
             'groq_prediction': 1 if groq_predicts_bias else 0,
@@ -128,16 +150,16 @@ Classification: {label}
 
 Provide a brief 2-sentence explanation focusing on the language patterns and potential bias indicators.'''
 
-        explanation = self._chat(prompt, max_tokens=90)
+        explanation = self._chat(prompt, max_tokens=100)
         if not explanation:
-            explanation = 'Unable to generate explanation.'
+            explanation = groq_analysis['groq_raw_output'] if groq_analysis else 'Unable to generate explanation.'
         else:
             if disagreement:
                 explanation = f"[Groq Override] {explanation}"
 
         result = {
             'explanation': explanation,
-            'model': 'Groq (llama-3.3-70b-versatile)',
+            'model': f'Groq ({self.model_name})',
             'reasoning_confidence': final_confidence,
             'groq_prediction': final_prediction,
             'baseline_prediction': prediction,
@@ -171,25 +193,25 @@ Provide a brief 2-sentence explanation focusing on the language patterns and pot
             'groq_label': 'Biased' if groq_pred == 1 else 'Fair',
             'disagreement_reason': None if agreement else 'Models detected different patterns',
             'baseline_model': {
-                'name': 'Random Forest',
+                'name': 'Random Forest + SBERT',
                 'type': 'ML Classifier',
                 'explanation': baseline_explanation,
                 'explanation_length': len(baseline_explanation.split()),
             },
             'groq_model': {
-                'name': 'Groq (llama-3.3-70b-versatile)',
-                'type': 'LLM',
+                'name': f'Groq ({self.model_name})',
+                'type': 'LLM (Autoregressive)',
                 'explanation': groq_result.get('explanation', ''),
                 'explanation_length': len(groq_result.get('explanation', '').split()),
             },
             'comparison_metrics': {
-                'baseline_focused': 'Explicit toxic patterns',
-                'groq_focused': 'Contextual bias and stereotypes',
+                'baseline_focused': 'Explicit toxic patterns & semantic similarity',
+                'groq_focused': 'Contextual bias, stereotypes & deep language understanding',
                 'baseline_concise': len(baseline_explanation.split()) < 20,
-                'groq_detailed': len(groq_result.get('explanation', '').split()) > 20,
+                'groq_detailed': len(groq_result.get('explanation', '').split()) > 10,
                 'recommendation': (
                     'Both models agree on classification' if agreement
-                    else 'Groq detected patterns that baseline missed - consider reviewing manually'
+                    else 'Groq detected nuance that baseline missed - consider reviewing manually'
                 ),
             },
         }
@@ -205,7 +227,7 @@ def get_groq_reasoner():
         print('Loading Groq model for reasoning...')
         _groq_reasoner = GroqReasoner()
         if _groq_reasoner.available:
-            print('Groq model loaded successfully!')
+            print(f'Groq model ({_groq_reasoner.model_name}) loaded successfully!')
         else:
             print('Warning: Groq model not available')
 

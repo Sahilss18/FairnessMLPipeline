@@ -3,9 +3,20 @@ Configuration file for the Fairness and Bias Detection System.
 Contains all paths, hyperparameters, and global settings.
 """
 import os
+try:
+    from dotenv import load_dotenv
+    # Load .env file from project base directory
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
+except ImportError:
+    pass
 
 # Base directory
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Groq API Configuration
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+GROQ_MODEL = os.getenv('GROQ_MODEL', 'qwen/qwen3.8-27b')
+
 
 # Directory paths
 DATA_DIR = os.path.join(BASE_DIR, 'AiFairness.csv')  # Updated to actual dataset location

@@ -432,7 +432,9 @@ if __name__ == '__main__':
     print("  GET  /api/audit/verify  - Verify chain integrity")
     print("  GET  /api/audit/export  - Export audit log")
     print("  GET  /api/audit/stats   - Get audit statistics")
-    print("\nStarting server on http://localhost:5000")
+    port = int(os.environ.get('PORT', 5000))
+    print(f"\nStarting server on http://0.0.0.0:{port}")
     print("="*70 + "\n")
     
-    app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
+    app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False)
+

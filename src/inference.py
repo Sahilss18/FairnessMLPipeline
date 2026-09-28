@@ -30,7 +30,11 @@ class BiasDetector:
             embedder_name: Name of sentence transformer model
         """
         print("Initializing Bias Detector...")
-        self.model = load_model(model_path)
+        try:
+            self.model = load_model(model_path)
+        except Exception as e:
+            print(f"Notice: Offline RF model not loaded ({e}). Using semantic sentence-transformer inference.")
+            self.model = None
         self.embedder = SentenceTransformer(embedder_name)
         
         # Pre-compute reference embeddings
@@ -53,9 +57,15 @@ class BiasDetector:
         # Generate embedding
         embedding = self.embedder.encode([comment])
         
-        # Get model prediction
-        rf_prediction = self.model.predict(embedding)[0]
-        rf_probability = self.model.predict_proba(embedding)[0][1]
+        # Get model prediction (optional auxiliary check)
+        rf_prediction = None
+        rf_probability = None
+        if self.model is not None:
+            try:
+                rf_prediction = self.model.predict(embedding)[0]
+                rf_probability = self.model.predict_proba(embedding)[0][1]
+            except Exception:
+                pass
         
         # Calculate semantic similarities
         cos_positive = util.cos_sim(embedding, self.positive_ref).item()

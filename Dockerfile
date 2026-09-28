@@ -11,9 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and models
+# Create runtime directories
+RUN mkdir -p models embeddings outputs data
+
+# Copy source code and api
 COPY src/ ./src/
-COPY models/ ./models/
 COPY api/ ./api/
 
 # Environment variables
@@ -23,3 +25,4 @@ ENV PORT=5000
 EXPOSE 5000
 
 CMD ["python", "api/app.py"]
+

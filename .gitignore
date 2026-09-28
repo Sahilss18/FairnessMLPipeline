@@ -44,13 +44,20 @@ wheels/
 *.pkl
 *.pem
 *.db
+*.npy
+models/*.pkl
+models/*.pem
+models/*.db
+api/models/*.pkl
+api/models/*.pem
+api/models/*.db
 embeddings/*.npy
 data/*.csv
-models/
-api/models/
-
-# Outputs
-outputs/
+outputs/*
+!models/.gitkeep
+!embeddings/.gitkeep
+!outputs/.gitkeep
+!data/.gitkeep
 
 # Node modules and build
 node_modules/
